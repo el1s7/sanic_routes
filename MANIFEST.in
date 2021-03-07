@@ -1,0 +1,10 @@
+# Non Code related contents
+include LICENSE
+include README.md
+
+# Setup
+include setup.py
+include Makefile
+
+global-exclude __pycache__
+global-exclude *.py[co]
