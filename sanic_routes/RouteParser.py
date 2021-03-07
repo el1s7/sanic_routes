@@ -105,17 +105,17 @@ class RouteParser:
 		param_value_length = len(param_value) if isinstance(param_value, str) or isinstance(param_value, list) else param_value
 
 		if "min" in opts and param_value_length < opts["min"]:
-			raise InvalidParam(param_name,"The minimum value is {}".format(param_name,opts["min"]))
+			raise InvalidParam(param_name,"The minimum value is {}".format(opts["min"]))
 		
 		if "max" in opts and param_value_length > opts["max"]:
-			raise InvalidParam(param_name,"The maximum value is {}".format(param_name, opts["max"]))
+			raise InvalidParam(param_name,"The maximum value is {}".format(opts["max"]))
 		
 		if "multiple" in opts and (param_value_length % opts["multiple"]) != 0:
-			raise InvalidParam(param_name,"The value must be a multiple of {}".format(param_name, opts["multiple"]))
+			raise InvalidParam(param_name,"The value must be a multiple of {}".format(opts["multiple"]))
 
 		return param_value
 
-	def _parse_params(self, request: sanicRequest.Request):
+	async def _parse_params(self, request: sanicRequest.Request):
 		
 		request_name = request.name.split(".")[-1]
 		if request_name not in self.routes:
