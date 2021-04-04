@@ -3,7 +3,7 @@ from .exceptions import InvalidParam, InvalidRoute
 import typing, sys
 from functools import reduce
 from sanic.router import Router
-
+from .objectify import objectify
 
 class RouteParser:
 
@@ -88,22 +88,27 @@ class RouteParser:
 
 		if param_name not in param_values:
 			if "required" in opts and opts["required"]:
-				raise InvalidParam(param_name, error_msg)
+				raise InvalidParam(param_name, error_msg) # Required and not included
 
 			if "default" not in opts:
-				raise InvalidParam(param_name, error_msg)
+				return None
 			
-
 		param_value = param_values[param_name] if param_name in param_values else opts["default"]
 
 		if isinstance(param_value, list) and param_location != "json" and len(param_value) == 1:
 			param_value = param_value[0]
 
 		if "type" in opts and callable(opts["type"]):
-			param_value = opts["type"](param_value)
-
+			try:
+				param_value = opts["type"](param_value)
+			except:
+				raise InvalidParam(param_name, error_msg)
+		
 		param_value_length = len(param_value) if isinstance(param_value, str) or isinstance(param_value, list) else param_value
 
+		if "in" in opts and (isinstance(opts["in"], list) or isinstance(opts["in"], dict)) and param_value not in opts["in"]:
+			raise InvalidParam(param_name, error_msg)
+		
 		if "min" in opts and param_value_length < opts["min"]:
 			raise InvalidParam(param_name,"The minimum value is {}".format(opts["min"]))
 		
@@ -111,8 +116,8 @@ class RouteParser:
 			raise InvalidParam(param_name,"The maximum value is {}".format(opts["max"]))
 		
 		if "multiple" in opts and (param_value_length % opts["multiple"]) != 0:
-			raise InvalidParam(param_name,"The value must be a multiple of {}".format(opts["multiple"]))
-
+			raise InvalidParam(param_name, "The value must be a multiple of {}".format(opts["multiple"]))
+		
 		return param_value
 
 	async def _parse_params(self, request: sanicRequest.Request):
@@ -129,7 +134,7 @@ class RouteParser:
 			for param in opts["params"]:
 				params[param] = self._param(param, opts["params"][param], opts, request)
 
-		request.ctx.params = params
+		request.ctx.params = objectify(params)
 
 		# Call Middlewares
 		if "before" in opts:
