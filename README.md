@@ -12,8 +12,8 @@ schema = {
 	'login': {
 		'method': 'POST',
 		'path': '/login',
-		'controller': 'user.login' # By default controller is the key name
-		'before': ['user.logged'] # Array of middlewares before request
+		'controller': 'login' # By default controller is the key name
+		'before': ['logged_check'] # Array of middlewares before request
 		'params': {
 			'username': {
 				'required': True,
@@ -31,7 +31,13 @@ schema = {
 }
 
 routes = make_routes(schema, controllers=controllers, middlewares=middlewares)
+```
 
+> controllers.py
+```python
+async def login(request):
+	params = request.ctx.params
+	usename = params.username # Parsed from params
 ```
 
 > app.py
