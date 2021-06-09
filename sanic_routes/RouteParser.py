@@ -80,7 +80,7 @@ class RouteParser:
 			'after': after_wares
 		}
 		
-		return [controller_name, opts["path"], opts["method"]]
+		return [controller_name, opts["path"], method]
 
 	def _param(self, name: str, opts: dict, route: dict, request: sanicRequest.Request):
 		locations = {

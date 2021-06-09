@@ -7,7 +7,7 @@ INSTALL_REQUIRES = [
 
 setup(
     name='sanic_routes',
-    version='1.0.1',
+    version='1.0.13',
     description='API Route Schema for Sanic.',
     long_description='Generate routes and validate parameters from a JSON schema.',
     license='GPL 3.0',
