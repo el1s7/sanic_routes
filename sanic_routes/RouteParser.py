@@ -11,10 +11,14 @@ class RouteParser:
 		self.routes = routes
 		self.controllers = controllers
 		self.middlewares = middlewares
+		
+		
 		self.app = app if app and (isinstance(app, Blueprint) or isinstance(app, Sanic)) else Blueprint('routes')
 
 	def parse(self, routes=None):
 		self.routes = routes if routes else self.routes
+		self.route_wares = {}
+		
 		if not self.routes:
 			raise InvalidRoute("Routes config is required")
 		
@@ -28,30 +32,53 @@ class RouteParser:
 		
 	def _route(self, name: str, opts: typing.Dict[str, typing.Union[str, list, dict]]):
 		controller_name = opts["controller"] if "controller" in opts else name
-		mwares = []
+		
 		allowed_methods = ["get","post","put","delete","patch"]
-
-		if "before" in opts:
-			mwares.extend(opts["before"])
+		method = "get" if not "method" in opts or not opts["method"] else opts["method"].lower()
 		
-		if "after" in opts:
-			mwares.extend(opts["after"])
+		before_wares = []
 		
-		if not self.rhasattr(self.controllers, controller_name):
-			# Controller not found
-			raise InvalidRoute("Controller not found: %s" % controller_name)
+		before_wares_key = "request" if "request" in "opts" else "before"
 		
-		for mware in mwares:
-			if not self.rhasattr(self.middlewares, mware):
-				# Middleware not found
-				raise InvalidRoute("Middleware not found: %s" % mware)
+		after_wares = []
+		after_wares_key = "response" if "response" in "opts" else "after"
+		
+		if method not in allowed_methods:
+			raise InvalidRoute("Invalid route request method: %s" % method)
 		
 		if not "path" in opts:
 			# Path not specified
 			raise InvalidRoute("Path not specified")
+			
+		if not self.rhasattr(self.controllers, controller_name):
+			# Controller not found
+			raise InvalidRoute("Route controller not found: %s" % controller_name)
+		
+		if before_wares_key in opts:
+			before_wares.extend(opts[before_wares_key] if isinstance(opts[before_wares_key],list) else [opts[before_wares_key]])
+		
+		if after_wares_key in opts:
+			after_wares.extend(opts[after_wares_key] if isinstance(opts[after_wares_key],list) else [opts[after_wares_key]])
+		
+		for before_ware in before_wares:
+			if not self.rhasattr(self.middlewares, before_ware):
+				# Middleware not found
+				raise InvalidRoute("Route before middleware not found: %s" % before_ware)
+				
+		for after_ware in after_wares:
+			if not self.rhasattr(self.middlewares, after_ware):
+				# Middleware not found
+				raise InvalidRoute("Route after middleware not found: %s" % after_ware)
+			callable_ware = self.rgetattr(self.middlewares, after_ware)
+			if not iscallable(callable_ware):
+				raise InvalidRoute("Route after middleware is not a function: %s" % callable_ware)
 
-		if not "method" in opts or opts["method"].lower() not in allowed_methods:
-			raise InvalidRoute("Invalid request method")
+			self.app.middleware('response')(callable_ware)
+		
+		self.route_wares[name] = {
+			'before': before_wares,
+			'after': after_wares
+		}
 		
 		return [controller_name, opts["path"], opts["method"]]
 
@@ -122,11 +149,12 @@ class RouteParser:
 
 	async def _parse_params(self, request: sanicRequest.Request):
 		
-		request_name = request.name.split(".")[-1]
-		if request_name not in self.routes:
+		before_wares_key = "request" if "request" in "opts" else "before"
+		name = request.name.split(".")[-1]
+		if name not in self.routes:
 			raise InvalidRoute("Request not matching any route.")
 		
-		opts = self.routes[request_name]
+		opts = self.routes[name]
 
 		# Parse Params
 		params = {}
@@ -137,9 +165,8 @@ class RouteParser:
 		request.ctx.params = objectify(params)
 
 		# Call Middlewares
-		if "before" in opts:
-			mwares = opts["before"] if isinstance(opts["before"],list) else [opts["before"]]
-			for mware in mwares:
+		if name in self.route_wares:
+			for before_ware in self.route_wares[name]['before']:
 				middleware = self.rgetattr(self.middlewares,mware)
 				if callable(middleware):
 					middleware(request)
