@@ -70,7 +70,7 @@ class RouteParser:
 				# Middleware not found
 				raise InvalidRoute("Route after middleware not found: %s" % after_ware)
 			callable_ware = self.rgetattr(self.middlewares, after_ware)
-			if not iscallable(callable_ware):
+			if not callable(callable_ware):
 				raise InvalidRoute("Route after middleware is not a function: %s" % callable_ware)
 
 			self.app.middleware('response')(callable_ware)
@@ -149,7 +149,6 @@ class RouteParser:
 
 	async def _parse_params(self, request: sanicRequest.Request):
 		
-		before_wares_key = "request" if "request" in "opts" else "before"
 		name = request.name.split(".")[-1]
 		if name not in self.routes:
 			raise InvalidRoute("Request not matching any route.")
@@ -162,12 +161,12 @@ class RouteParser:
 			for param in opts["params"]:
 				params[param] = self._param(param, opts["params"][param], opts, request)
 
-		request.ctx.params = objectify(params)
+		request.ctx.params = objectify(params, False)
 
 		# Call Middlewares
 		if name in self.route_wares:
 			for before_ware in self.route_wares[name]['before']:
-				middleware = self.rgetattr(self.middlewares,mware)
+				middleware = self.rgetattr(self.middlewares,before_ware)
 				if callable(middleware):
 					middleware(request)
 
